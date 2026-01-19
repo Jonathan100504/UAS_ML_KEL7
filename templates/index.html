@@ -1,0 +1,122 @@
+{% extends "base.html" %} {% block content %}
+<h1>Analisis Sentimen (IndoBERT + BERTopic)</h1>
+<style>
+  .btn {
+    appearance: none;
+    border: 0;
+    outline: 0;
+    cursor: pointer;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-weight: 600;
+    transition: 0.2s ease;
+    background: linear-gradient(180deg, var(--brand), var(--brand-2));
+    color: #00110b;
+    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.25);
+  }
+  .btn:hover {
+    transform: translateY(-1px);
+  }
+  .btn.secondary {
+    background: var(--chip);
+    color: var(--text);
+    border: 1px solid var(--border);
+    box-shadow: none;
+  }
+  .btn.ghost {
+    background: transparent;
+    color: var(--text);
+  }
+</style>
+{% if error %}
+<div
+  style="
+    background: #ffe8e8;
+    padding: 10px;
+    border: 1px solid #f4bcbc;
+    margin-bottom: 12px;
+  "
+>
+  {{ error }}
+</div>
+{% endif %}
+
+<form method="post" action="/analyze">
+  <p>
+    App ID:
+    <input
+      type="text"
+      name="app_id"
+      placeholder="com.google.android.apps.fitness"
+      required
+    />
+  </p>
+  <p>
+    Lang: <input type="text" name="lang" value="{{ defaults.lang }}" /> Country:
+    <input type="text" name="country" value="{{ defaults.country }}" />
+  </p>
+  <p>
+    Date Min:
+    <input type="date" name="date_min" value="{{ defaults.date_min }}" /> Date
+    Max: <input type="date" name="date_max" value="{{ defaults.date_max }}" />
+  </p>
+  <p>
+    Target Reviews:
+    <input
+      type="number"
+      name="target_reviews"
+      value="{{ defaults.target_reviews }}"
+    />
+  </p>
+
+  <p>
+    Label Mode:
+    <select name="label_mode">
+      <option value="3class">3-class (neg/neu/pos)</option>
+      <option value="binary">Binary (1–2 vs 4–5)</option>
+      <option value="binary_strict" selected>Binary Strict (1 vs 5)</option>
+    </select>
+    <small>— rekomendasi untuk akurasi tinggi</small>
+  </p>
+
+  <h3>Hyperparameters IndoBERT</h3>
+  <p>
+    Epochs:
+    <input
+      type="number"
+      name="epochs"
+      min="1"
+      max="10"
+      value="{{ defaults.epochs }}"
+    />
+  </p>
+  <p>
+    Learning Rate:
+    <select name="learning_rate">
+      <option value="1e-5" {% if defaults.learning_rate == '1e-5' %}selected{% endif %}>1e-5 (Sangat Kecil - Konservatif)</option>
+      <option value="2e-5" {% if defaults.learning_rate == '2e-5' %}selected{% endif %}>2e-5 (Kecil - Default)</option>
+      <option value="3e-5" {% if defaults.learning_rate == '3e-5' %}selected{% endif %}>3e-5 (Sedang)</option>
+      <option value="4e-5" {% if defaults.learning_rate == '4e-5' %}selected{% endif %}>4e-5 (Besar)</option>
+      <option value="5e-5" {% if defaults.learning_rate == '5e-5' %}selected{% endif %}>5e-5 (Sangat Besar - Agresif)</option>
+    </select>
+    <small>— Semakin besar, pembelajaran lebih cepat tapi risiko overfitting tinggi</small>
+  </p>
+  <p>
+    Batch Size:
+    <select name="batch_size">
+      <option value="8" {% if defaults.batch_size == '8' %}selected{% endif %}>8 (Pembelajaran Lebih Lambat)</option>
+      <option value="16" {% if defaults.batch_size == '16' %}selected{% endif %}>16 (Default - Balanced)</option>
+      <option value="32" {% if defaults.batch_size == '32' %}selected{% endif %}>32 (Lebih Cepat)</option>
+      <option value="64" {% if defaults.batch_size == '64' %}selected{% endif %}>64 (Sangat Cepat)</option>
+    </select>
+    <small>— Batch size kecil = gradient lebih stabil, besar = learning lebih cepat</small>
+  </p>
+  <p>
+    <label
+      ><input type="checkbox" name="run_bertopic" checked /> Jalankan
+      BERTopic</label
+    >
+  </p>
+  <button class="btn" type="submit">Analisis Sekarang</button>
+</form>
+{% endblock %}

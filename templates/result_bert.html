@@ -1,0 +1,704 @@
+{% extends "base.html" %} {% block content %}
+<h1>Hasil Analisis — IndoBERT</h1>
+
+<p>
+  <b>App ID:</b> {{ app_id }} | <b>Lang/Country:</b> {{ lang }}/{{ country }} |
+  <b>Label Mode:</b> {{ label_mode }}
+</p>
+<p>
+  <b>Rentang Tanggal:</b> {{ date_min }} → {{ date_max }} |
+  <b>Target Reviews:</b> {{ target_reviews }}
+</p>
+
+<hr />
+<h2>Langkah-langkah Preprocessing (Before/After)</h2>
+
+<h3>1) Pembersihan Data &amp; Filter</h3>
+<table>
+  <tbody>
+    <tr>
+      <td>Total mentah</td>
+      <td>{{ pstats.steps.raw_total }}</td>
+    </tr>
+    <tr>
+      <td>Setelah drop missing (content/score)</td>
+      <td>
+        {{ pstats.steps.after_dropna }} (hapus {{ pstats.steps.missing_removed
+        }})
+      </td>
+    </tr>
+    <tr>
+      <td>Setelah filter tanggal</td>
+      <td>{{ pstats.steps.after_date_filter }}</td>
+    </tr>
+    <tr>
+      <td>Setelah mapping label (keep sesuai mode)</td>
+      <td>{{ pstats.steps.after_label_keep }}</td>
+    </tr>
+    <tr>
+      <td>Setelah deduplikasi teks</td>
+      <td>
+        {{ pstats.steps.after_dedup }} (hapus {{ pstats.steps.removed_duplicates
+        }})
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>2) Normalisasi</h3>
+<div style="display: flex; gap: 24px; flex-wrap: wrap">
+  <div>
+    <b>Raw → Clean</b>
+    <pre>
+{% for r in examples.clean_examples %}
+- {{ r.content }}
+  → {{ r.clean }}
+
+{% endfor %}
+</pre
+    >
+  </div>
+  <div>
+    <b>Clean → Normalized</b>
+    <pre>
+{% for r in examples.norm_examples %}
+- {{ r.clean }}
+  → {{ r.normalized }}
+
+{% endfor %}
+</pre
+    >
+  </div>
+</div>
+
+<h3>Tahapan Tokenization</h3>
+{% if token_preview and token_preview|length > 0 %}
+<pre>
+{% for t in token_preview -%}
+- Text: {{ t.text }}
+  tokens: {{ t.tokens | tojson }}
+{% endfor %}
+</pre>
+{% else %}
+<p><i>Tidak ada sampel token untuk ditampilkan.</i></p>
+{% endif %}
+
+<!-- Distribusi Label -->
+<h3>Distribusi Label</h3>
+<p style="margin: 6px 0 12px 0; color: #666">
+  Grafik menampilkan jumlah data per label setelah seluruh langkah pembersihan.
+</p>
+<img
+  src="{{ label_plot_file }}"
+  alt="Distribusi Label"
+  style="
+    max-width: 650px;
+    width: 100%;
+    height: auto;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 6px;
+    background: #fff;
+  "
+/>
+
+<!-- WordCloud -->
+<h3 style="margin-top: 18px">WordCloud</h3>
+<p style="margin: 6px 0 12px 0; color: #666">
+  WordCloud dibuat dari kolom <code>final_text</code> (setelah clean,
+  normalisasi, dan stopword removal).
+</p>
+<div
+  style="
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  "
+>
+  {% for wc in wordcloud_files %}
+  <figure style="margin: 0">
+    <img
+      src="{{ wc.img }}"
+      alt="{{ wc.title }}"
+      style="
+        width: 100%;
+        height: auto;
+        border: 1px solid #eee;
+        border-radius: 8px;
+        background: #fff;
+      "
+    />
+    <figcaption style="text-align: center; margin-top: 6px; color: #555">
+      {{ wc.title }}
+    </figcaption>
+  </figure>
+  {% endfor %}
+</div>
+
+<h3>3) Pembagian Data</h3>
+<ul>
+  <li>Training: {{ split_info.train_size }} dokumen</li>
+  <li>Validation (eval Trainer): {{ split_info.valid_size }} dokumen</li>
+  <li>
+    Testing terpisah: {{ split_info.test_size }} (tidak dibuat di aplikasi ini)
+  </li>
+</ul>
+
+<!-- Learning Curves -->
+{% if curve_loss_file or curve_metrics_file %}
+<hr />
+<h2>Learning Curves</h2>
+<p style="margin: 6px 0 12px 0; color: #666">
+  Kurva ini berasal dari log <code>Trainer</code> per epoch selama fine-tuning
+  IndoBERT.
+</p>
+
+{% if curve_loss_file %}
+<h3>Train vs Eval Loss</h3>
+<img
+  src="{{ curve_loss_file }}"
+  alt="Loss Curves"
+  style="
+    max-width: 650px;
+    width: 100%;
+    height: auto;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    background: #fff;
+    padding: 6px;
+  "
+/>
+{% endif %} {% if curve_metrics_file %}
+<h3 style="margin-top: 16px">Eval Accuracy &amp; F1 Macro</h3>
+<img
+  src="{{ curve_metrics_file }}"
+  alt="Metric Curves"
+  style="
+    max-width: 650px;
+    width: 100%;
+    height: auto;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    background: #fff;
+    padding: 6px;
+  "
+/>
+{% endif %} {% endif %}
+
+<hr />
+<h2>Metrik Klasifikasi (Final)</h2>
+<p><b>Best:</b> {{ best_params }}</p>
+<ul>
+  <li>Accuracy: {{ acc }}</li>
+  <li>F1 Macro: {{ f1_macro }}</li>
+  <li>F1 Weighted: {{ f1_weighted }}</li>
+</ul>
+
+<img
+  src="{{ plot_file }}"
+  alt="Confusion Matrix"
+  style="max-width: 600px; width: 100%; height: auto"
+/>
+
+<h3>Classification Report</h3>
+<pre>{{ report }}</pre>
+
+{% if pre_report %}
+<hr />
+<h2>Classification Reports per Epoch</h2>
+<p><b>Epoch 0 (Baseline sebelum training)</b></p>
+<pre>{{ pre_report }}</pre>
+
+{% for r in epoch_reports %}
+<h3>Epoch {{ r.epoch }}</h3>
+<p>
+  Accuracy: {{ "%.4f"|format(r.acc) }} | F1 Macro: {{ "%.4f"|format(r.f1_macro)
+  }}
+</p>
+<pre>{{ r.report }}</pre>
+{% endfor %} {% endif %} {% if topics_info %}
+<hr />
+<h2>BERTopic</h2>
+<p><b>Jumlah topik (≠ -1):</b> {{ topics_info.n_topics }}</p>
+<img
+  src="{{ topics_info.freq_image }}"
+  alt="Topic Frequency"
+  style="max-width: 800px; width: 100%; height: auto"
+/>
+
+<h3>Topik &amp; Kata Kunci</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Topic ID</th>
+      <th>Kata Kunci</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in topics_info.top_keywords %}
+    <tr>
+      <td>{{ r.topic_id }}</td>
+      <td>{{ r.keywords }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<hr />
+<h2>Analisis Lanjutan — ABSA, Confidence Score & Ambiguity</h2>
+
+<!-- Confidence Score Distribution -->
+<h3>1) Distribusi Confidence Score</h3>
+<p style="margin: 6px 0 12px 0; color: #666">
+  Confidence score menunjukkan tingkat keyakinan model dalam prediksi. Nilai
+  lebih tinggi = lebih percaya diri.
+</p>
+<div
+  style="
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  "
+>
+  <div
+    style="
+      background: var(--panel);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    "
+  >
+    <p style="margin: 0 0 6px 0; color: var(--muted); font-size: 0.9rem">
+      Mean Confidence
+    </p>
+    <p style="margin: 0; font-size: 1.6rem; font-weight: bold">
+      {{ "%.3f"|format(confidence_stats.mean) }}
+    </p>
+  </div>
+  <div
+    style="
+      background: var(--panel);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    "
+  >
+    <p style="margin: 0 0 6px 0; color: var(--muted); font-size: 0.9rem">
+      Median Confidence
+    </p>
+    <p style="margin: 0; font-size: 1.6rem; font-weight: bold">
+      {{ "%.3f"|format(confidence_stats.median) }}
+    </p>
+  </div>
+  <div
+    style="
+      background: var(--panel);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    "
+  >
+    <p style="margin: 0 0 6px 0; color: var(--muted); font-size: 0.9rem">
+      Std Dev
+    </p>
+    <p style="margin: 0; font-size: 1.6rem; font-weight: bold">
+      {{ "%.3f"|format(confidence_stats.std) }}
+    </p>
+  </div>
+</div>
+
+{% if confidence_dist_plot %}
+<img
+  src="{{ confidence_dist_plot }}"
+  alt="Confidence Distribution"
+  style="
+    max-width: 800px;
+    width: 100%;
+    height: auto;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 6px;
+    background: #fff;
+    margin-bottom: 16px;
+  "
+/>
+{% endif %}
+
+<!-- Ambiguity Breakdown -->
+<h3 style="margin-top: 18px">
+  2) Analisis Ambiguity (Ketidakjelasan Prediksi)
+</h3>
+<p style="margin: 6px 0 12px 0; color: #666">
+  Ambiguity terdeteksi berdasarkan 4 komponen: low confidence, high entropy,
+  close margin antar kelas, dan kontradiksi keyword (positive vs negative).
+</p>
+
+<div
+  style="
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  "
+>
+  <div
+    style="
+      background: var(--panel);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    "
+  >
+    <p style="margin: 0 0 6px 0; color: var(--muted); font-size: 0.9rem">
+      Total Ambiguous
+    </p>
+    <p style="margin: 0; font-size: 1.8rem; font-weight: bold; color: #ff6b6b">
+      {{ ambiguity_summary.total_ambiguous }}
+    </p>
+    <p style="margin: 6px 0 0 0; font-size: 0.85rem; color: #999">
+      {{ "%.1f"|format(ambiguity_summary.ambiguous_ratio) }}% dari total
+    </p>
+  </div>
+  <div
+    style="
+      background: var(--panel);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    "
+  >
+    <p style="margin: 0 0 6px 0; color: var(--muted); font-size: 0.9rem">
+      Low Confidence
+    </p>
+    <p style="margin: 0; font-size: 1.6rem; font-weight: bold">
+      {{ ambiguity_summary.low_confidence }}
+    </p>
+  </div>
+  <div
+    style="
+      background: var(--panel);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    "
+  >
+    <p style="margin: 0 0 6px 0; color: var(--muted); font-size: 0.9rem">
+      High Entropy
+    </p>
+    <p style="margin: 0; font-size: 1.6rem; font-weight: bold">
+      {{ ambiguity_summary.high_entropy }}
+    </p>
+  </div>
+  <div
+    style="
+      background: var(--panel);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    "
+  >
+    <p style="margin: 0 0 6px 0; color: var(--muted); font-size: 0.9rem">
+      Close Margin
+    </p>
+    <p style="margin: 0; font-size: 1.6rem; font-weight: bold">
+      {{ ambiguity_summary.close_margin }}
+    </p>
+  </div>
+  <div
+    style="
+      background: var(--panel);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    "
+  >
+    <p style="margin: 0 0 6px 0; color: var(--muted); font-size: 0.9rem">
+      Contrastive KW
+    </p>
+    <p style="margin: 0; font-size: 1.6rem; font-weight: bold">
+      {{ ambiguity_summary.contrastive_keywords }}
+    </p>
+  </div>
+</div>
+
+{% if ambiguity_breakdown_plot %}
+<img
+  src="{{ ambiguity_breakdown_plot }}"
+  alt="Ambiguity Breakdown"
+  style="
+    max-width: 700px;
+    width: 100%;
+    height: auto;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 6px;
+    background: #fff;
+    margin-bottom: 16px;
+  "
+/>
+{% endif %}
+
+<!-- Aspects (ABSA) -->
+{% if aspects_plot %}
+<h3 style="margin-top: 18px">3) Aspect-Based Sentiment Analysis (ABSA)</h3>
+<p style="margin: 6px 0 12px 0; color: #666">
+  Frekuensi aspek yang disebutkan dalam review. Aspek diidentifikasi melalui
+  keyword matching.
+</p>
+<img
+  src="{{ aspects_plot }}"
+  alt="Aspects Frequency"
+  style="
+    max-width: 800px;
+    width: 100%;
+    height: auto;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 6px;
+    background: #fff;
+    margin-bottom: 16px;
+  "
+/>
+{% endif %}
+
+<hr />
+<style>
+  .review-row-ambiguous {
+    background-color: rgba(255, 107, 107, 0.15) !important;
+    border-left: 3px solid #ff6b6b !important;
+  }
+</style>
+
+<h2>Sampel Review dengan Confidence Score & Ambiguity Status</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Score</th>
+      <th>Label</th>
+      <th>Confidence</th>
+      <th>Ambiguous?</th>
+      <th>Aspects</th>
+      <th>Content</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in preview %}
+    <tr class="{% if r.is_ambiguous %}review-row-ambiguous{% endif %}">
+      <td>{{ r.score }}</td>
+      <td>{{ r.label }}</td>
+      <td>
+        <span style="font-family: monospace; font-weight: bold"
+          >{{ r.confidence }}</span
+        >
+      </td>
+      <td>
+        {% if r.is_ambiguous %}
+        <span style="color: #ff6b6b; font-weight: bold">⚠ Yes</span>
+        <br />
+        <small style="color: #999">{{ r.ambiguity_types | join(', ') }}</small>
+        {% else %}
+        <span style="color: #27ae60">✓ No</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if r.aspects %}
+        <small>{{ r.aspects | join(', ') }}</small>
+        {% else %}
+        <small style="color: #999">—</small>
+        {% endif %}
+      </td>
+      <td style="max-width: 300px; white-space: normal; word-break: break-word">
+        {{ r.content }}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if ambiguous_reviews %}
+<hr />
+<h2>Top Ambiguous Reviews (Rincian Lengkap)</h2>
+<p style="color: #666; margin-bottom: 12px">
+  Review dengan tingkat ambiguity tertinggi berdasarkan multi-komponen analysis.
+</p>
+<div style="display: grid; gap: 16px">
+  {% for r in ambiguous_reviews[:10] %}
+  <div
+    style="
+      background: var(--panel);
+      padding: 14px;
+      border-radius: 8px;
+      border-left: 4px solid #ff6b6b;
+      border: 1px solid var(--border);
+    "
+  >
+    <div
+      style="
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 8px;
+      "
+    >
+      <div>
+        <span
+          style="
+            background: #ff6b6b;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+          "
+        >
+          Ambiguous
+        </span>
+        <span style="margin-left: 8px; color: var(--muted); font-size: 0.9rem">
+          True: <b>{{ r.true_label }}</b> | Pred: <b>{{ r.pred_label }}</b>
+        </span>
+      </div>
+      <div style="text-align: right">
+        <div style="font-size: 0.85rem; color: #999">
+          Confidence: <b>{{ "%.3f"|format(r.confidence) }}</b>
+        </div>
+        <div style="font-size: 0.85rem; color: #999">
+          Entropy: <b>{{ "%.3f"|format(r.entropy) }}</b>
+        </div>
+        <div style="font-size: 0.85rem; color: #999">
+          Margin: <b>{{ "%.3f"|format(r.margin) }}</b>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin: 8px 0; color: var(--text); line-height: 1.5">
+      <b>Review:</b> {{ r.text }}
+    </p>
+
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px">
+      {% for amb_type in r.ambiguity_types %} {% if amb_type == 'low_confidence'
+      %}
+      <span
+        style="
+          background: #ff6b6b;
+          color: white;
+          padding: 3px 8px;
+          border-radius: 4px;
+          font-size: 0.8rem;
+        "
+        >Low Conf</span
+      >
+      {% elif amb_type == 'high_entropy' %}
+      <span
+        style="
+          background: #ffa500;
+          color: white;
+          padding: 3px 8px;
+          border-radius: 4px;
+          font-size: 0.8rem;
+        "
+        >High Entropy</span
+      >
+      {% elif amb_type == 'close_margin' %}
+      <span
+        style="
+          background: #ffd93d;
+          color: #333;
+          padding: 3px 8px;
+          border-radius: 4px;
+          font-size: 0.8rem;
+        "
+        >Close Margin</span
+      >
+      {% elif amb_type == 'contrastive_keywords' %}
+      <span
+        style="
+          background: #6bcb77;
+          color: white;
+          padding: 3px 8px;
+          border-radius: 4px;
+          font-size: 0.8rem;
+        "
+        >Contrastive KW</span
+      >
+      {% endif %} {% endfor %}
+    </div>
+
+    {% if r.aspects %}
+    <div
+      style="
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+      "
+    >
+      <small style="color: var(--muted)">
+        <b>Aspects:</b> {{ r.aspects | join(', ') }}
+      </small>
+    </div>
+    {% endif %}
+
+    <div
+      style="
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+        font-size: 0.85rem;
+      "
+    >
+      <b>Probability Distribution:</b>
+      <div style="display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap">
+        {% for label, prob in r.probs_dict.items() %}
+        <div style="display: flex; align-items: center; gap: 4px">
+          {% if label == 'positive' %}
+          <span
+            style="
+              background: #27ae60;
+              color: white;
+              padding: 2px 6px;
+              border-radius: 3px;
+              font-size: 0.8rem;
+              font-weight: bold;
+            "
+            >{{ label | capitalize }}</span
+          >
+          {% elif label == 'negative' %}
+          <span
+            style="
+              background: #e74c3c;
+              color: white;
+              padding: 2px 6px;
+              border-radius: 3px;
+              font-size: 0.8rem;
+              font-weight: bold;
+            "
+            >{{ label | capitalize }}</span
+          >
+          {% else %}
+          <span
+            style="
+              background: #bdc3c7;
+              color: white;
+              padding: 2px 6px;
+              border-radius: 3px;
+              font-size: 0.8rem;
+              font-weight: bold;
+            "
+            >{{ label | capitalize }}</span
+          >
+          {% endif %}
+          <span style="font-weight: bold"
+            >{{ "%.2f"|format(prob * 100) }}%</span
+          >
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<p><a href="/">← Kembali</a></p>
+{% endblock %}
